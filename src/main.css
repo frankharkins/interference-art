@@ -191,6 +191,7 @@
         aspect-ratio: 3 / 4;
         margin-top: 1rem;
         margin-bottom: 1.5rem;
+        touch-action: none;
     }
 
     /* There's a lot of css here to handle different browsers; see
