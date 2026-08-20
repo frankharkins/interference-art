@@ -26,6 +26,11 @@ canvasId =
     "webgl-canvas"
 
 
+canvasResolution : Vec2
+canvasResolution =
+    vec2 1024 1365
+
+
 
 ------
 
@@ -126,7 +131,7 @@ type alias Values =
 
 defaultValues : Values
 defaultValues =
-    { canvasSize = vec2 576 768
+    { canvasSize = canvasResolution
     , wavesources =
         [ vec2 0.33 0.75
         , vec2 0.66 0.25
