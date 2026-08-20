@@ -1,0 +1,269 @@
+@import url('https://fonts.googleapis.com/css2?family=Karla&family=Source+Code+Pro:wght@400;700&display=swap');
+
+:root {
+    --main-font: "Source Code Pro", "sans-serif";
+
+    --color-white: #ecf2f8;
+    --color-grey-01: #d8dee4;
+    --color-grey-02: #c3c9cf;
+    --color-grey-03: #afb5bb;
+    --color-grey-04: #72777d;
+    --color-grey-05: #363a40;
+    --color-grey-06: #21252b;
+    --color-black: #0d1117;
+    --color-cursor: #58a6ff;
+    --color-blue: #0969da;
+    --color-cyan: #56d4dd;
+
+    --color-title: var(--color-black);
+    --color-bg: var(--color-white);
+    --color-body: var(--color-grey-04);
+    --color-muted: var(--color-grey-02);
+    --color-muted-extra: var(--color-grey-01);
+    --color-link: var(--color-blue);
+    --color-focus: var(--color-blue);
+    --color-cursor: var(--color-blue);
+
+    background-color: var(--color-white);
+    @media (prefers-color-scheme: dark) {
+        background-color: var(--color-black);
+    }
+
+    color: var(--color-body);
+    transition: all 0.1s ease-in-out;
+
+    [data-theme="Dark"] {
+        --color-title: var(--color-white);
+        --color-bg: var(--color-black);
+        --color-body: var(--color-grey-03);
+        --color-muted: var(--color-grey-05);
+        --color-muted-extra: var(--color-grey-06);
+        --color-link: var(--color-cyan);
+        --color-focus: var(--color-cyan);
+        --color-cursor: var(--color-cyan);
+    }
+
+    [data-theme="Default"] {
+        @media (prefers-color-scheme: dark) {
+            --color-title: var(--color-white);
+            --color-bg: var(--color-black);
+            --color-body: var(--color-grey-03);
+            --color-muted: var(--color-grey-05);
+            --color-muted-extra: var(--color-grey-06);
+            --color-link: var(--color-cyan);
+            --color-focus: var(--color-cyan);
+            --color-cursor: var(--color-cyan);
+        }
+    }
+
+    font-family: var(--main-font);
+    font-size: 18px;
+    line-height: 20px;
+    main, header {
+        max-width: 32rem;
+        margin: 0 auto;
+        padding: 0 4rem;
+    }
+
+    @media (max-width: 640px) {
+        font-size: 16px;
+        line-height: 18px;
+        main, header {
+            padding: 0 2rem;;
+        }
+    }
+
+    header {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    *:focus {
+      outline: solid var(--color-focus) 1px;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--main-font);
+      color: var(--color-title);
+      font-size: 1.05rem;
+      font-weight: bold;
+      margin-top: 2rem;
+    }
+
+    h2, h3 {
+        font-size: 0.85rem;
+    }
+
+    h3 {
+      font-weight: normal;
+    }
+
+    a {
+      color: var(--color-link);
+      transition: background 0.2s ease;
+    }
+
+    a:hover, a:focus {
+      color: var(--color-bg);
+      background: var(--color-link);
+      text-decoration: none;
+    }
+
+    pre {
+      border: 1px solid var(--color-muted-extra);
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    pre + pre[data-language="plaintext"] {
+      margin-top: -1rem;
+      border-top: none;
+      background: none;
+      line-height: .66rem;
+    }
+
+    pre > code {
+      font-size: .7rem;
+      background-color: unset;
+      border: none;
+    }
+
+    p > code {
+        font-size: 0.75rem;
+        border: 1px solid var(--color-muted-extra);
+        padding: 1px 4px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      padding-left: 1.2rem;
+    }
+
+    ul li:before {
+      content: '- ';
+      margin-left: -1rem;
+    }
+
+    p, ol, ul {
+      font-size: .9rem;
+      font-family: 'Karla', sans-serif;
+      margin: 1rem 0;
+      text-align: justify;
+    }
+
+    p:last-of-type {
+      margin-bottom: 2rem;
+    }
+
+    blockquote {
+      margin-right: 0;
+      margin-left: 0;
+      padding-left: 1rem;
+      border-left: 3px solid var(--color-muted-extra);
+    }
+
+    table {
+      margin: 1rem 0;
+    }
+
+    table, th, td {
+      border: 1px solid;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th, td {
+      padding: .3rem .5rem;
+      min-width: 4rem;
+    }
+
+    input {
+        width: 100%;
+    }
+
+    .webgl-canvas {
+        width: 100%;
+        display: block;
+        aspect-ratio: 3 / 4;
+        margin-top: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* There's a lot of css here to handle different browsers; see
+    https://www.smashingmagazine.com/2021/12/create-custom-range-input-consistent-browsers
+    for details. */
+
+    input[type="range"] {
+      grid-row-start: 1;
+      grid-column-start: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      padding: 12px 0;  /* Make clickable area bigger (for touch devices) */
+      width: 100%;
+    }
+
+    input[type="range"]:focus {
+      outline: none;
+    }
+
+    /* For chrome, ie, safari */
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: linear-gradient(
+        to right,
+        var(--color-body) var(--meter-value),
+        var(--color-muted-extra) var(--meter-value)
+      );
+      height: 5px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+       -webkit-appearance: none;
+       appearance: none;
+       margin-top: -5px;
+       height: 15px;
+       width: 5px;
+       background-color: var(--color-body);
+    }
+
+    input[type="range"]:focus::-webkit-slider-thumb {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 1px;
+    }
+
+    /* for firefox */
+    input[type="range"]::-moz-range-track {
+      background: linear-gradient(
+        to right,
+        var(--color-body) var(--meter-value),
+        var(--color-muted-extra) var(--meter-value)
+      );
+      height: 5px;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      border: none;
+      border-radius: 0;
+      background-color: var(--color-body);
+      height: 15px;
+      width: 5px;
+    }
+
+    input[type="range"]:focus::-moz-range-thumb {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 1px;
+    }
+}
+
+@keyframes fade-in-anim {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "format": "elm-format . --yes"
+  },
+  "devDependencies": {
+    "elm-format": "^0.8.8"
+  }
+}

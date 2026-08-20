@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Interference pattern</title>
+  <script type="text/javascript" src="main.js"></script>
+  <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+    <main data-theme="Default" class="container">
+        <h1>Interference pattern</h1>
+        <p>
+            Make art with wave interference patterns. Drag the sources around with
+            your pointer, and tap to create or delete them.
+        </p>
+        <div id="elm-app"></div>
+    </main>
+</body>
+
+<script type="text/javascript">
+// Start the Elm application.
+const app = Elm.Main.init({
+    node: document.getElementById('elm-app')
+});
+</script>
+
+
+</html>
