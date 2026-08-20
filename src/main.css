@@ -192,6 +192,7 @@
         margin-top: 1rem;
         margin-bottom: 1.5rem;
         touch-action: none;
+        image-rendering: pixelated;
     }
 
     /* There's a lot of css here to handle different browsers; see

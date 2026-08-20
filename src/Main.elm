@@ -26,11 +26,6 @@ canvasId =
     "webgl-canvas"
 
 
-canvasResolution : Vec2
-canvasResolution =
-    vec2 1024 1365
-
-
 
 ------
 
@@ -131,7 +126,7 @@ type alias Values =
 
 defaultValues : Values
 defaultValues =
-    { canvasSize = canvasResolution
+    { canvasSize = vec2 500 666
     , wavesources =
         [ vec2 0.33 0.75
         , vec2 0.66 0.25
@@ -272,8 +267,8 @@ moveWavesource old index coords =
 viewCanvas : Values -> Html UpdateMsg
 viewCanvas values =
     WebGL.toHtml
-        [ values.canvasSize |> Vec2.getX |> round |> Attr.width
-        , values.canvasSize |> Vec2.getY |> round |> Attr.height
+        [ values.canvasSize |> Vec2.getX |> round |> (*) 2 |> Attr.width
+        , values.canvasSize |> Vec2.getY |> round |> (*) 2 |> Attr.height
         , Attr.class "webgl-canvas"
         , Attr.id canvasId
         , Pointer.onDown (PointerUpdate << PointerDown)
@@ -482,7 +477,7 @@ fragmentShader =
         uniform vec3 wavesource10;
 
         void main() {
-            vec2 pixel_pos = gl_FragCoord.xy / canvasSize;
+            vec2 pixel_pos = gl_FragCoord.xy / (canvasSize * 2.0);
 
             float dist0 = distance(pixel_pos, wavesource0.xy);
             float dist1 = distance(pixel_pos, wavesource1.xy);
