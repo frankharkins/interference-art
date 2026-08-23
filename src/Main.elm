@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Browser.Dom
 import Browser.Events exposing (onAnimationFrameDelta)
-import Html exposing (Html, div, input, label, text)
+import Html exposing (Html, div, i, input, label, text)
 import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onInput)
 import Html.Events.Extra.Pointer as Pointer
@@ -59,10 +59,19 @@ main =
             \update model ->
                 case update of
                     TimeUpdate elapsedTime ->
-                        ( model, Cmd.none )
+                        if model.drifting then
+                            ( advanceAnimation model elapsedTime, Cmd.none )
+
+                        else
+                            ( model, Cmd.none )
 
                     SliderUpdate newValues ->
-                        ( { model | values = newValues }, Cmd.none )
+                        ( { model
+                            | values = newValues
+                            , drifting = False
+                          }
+                        , Cmd.none
+                        )
 
                     PointerUpdate event ->
                         ( pointerUpdate model event, Cmd.none )
@@ -131,6 +140,8 @@ updateCanvasSize model element =
 type alias Model =
     { values : Values
     , pointerState : PointerState
+    , animationState : AnimationState
+    , drifting : Bool
     }
 
 
@@ -138,6 +149,8 @@ defaultModel : Model
 defaultModel =
     { values = defaultValues
     , pointerState = Inactive
+    , animationState = initialAnimationState
+    , drifting = True
     }
 
 
@@ -184,20 +197,22 @@ pointerUpdate model action =
         Selected index ->
             case action of
                 PointerUp _ ->
-                    { pointerState = Inactive
-                    , values = deleteWavesource model.values index
+                    { model
+                        | pointerState = Inactive
+                        , values = deleteWavesource model.values index
                     }
 
                 PointerDown _ ->
                     model
 
                 PointerMove event ->
-                    { pointerState = Dragging index
-                    , values =
-                        moveWavesource
-                            model.values
-                            index
-                            (vec2FromTuple event.pointer.offsetPos)
+                    { model
+                        | pointerState = Dragging index
+                        , values =
+                            moveWavesource
+                                model.values
+                                index
+                                (vec2FromTuple event.pointer.offsetPos)
                     }
 
         Dragging index ->
@@ -282,8 +297,9 @@ selectWavesource model pointerCoords =
     case maybeClosestWavesource of
         Nothing ->
             -- Must be no values; Add a new wavesource and select that
-            { pointerState = Selected 0
-            , values = addWavesource model.values pointerCoords
+            { model
+                | pointerState = Selected 0
+                , values = addWavesource model.values pointerCoords
             }
 
         Just ( dist, index ) ->
@@ -291,8 +307,9 @@ selectWavesource model pointerCoords =
                 -- Either the pointer is close to a wavesource, or we've reached
                 -- the maximum allowed wavesources. In both cases we select the
                 -- closest wavesource rather than adding another.
-                { pointerState = Selected index
-                , values = moveWavesource model.values index pointerCoords
+                { model
+                    | pointerState = Selected index
+                    , values = moveWavesource model.values index pointerCoords
                 }
 
             else
@@ -302,9 +319,94 @@ selectWavesource model pointerCoords =
                     newIndex =
                         List.length model.values.wavesources
                 in
-                { pointerState = Dragging newIndex
-                , values = addWavesource model.values pointerCoords
+                { model
+                    | pointerState = Dragging newIndex
+                    , values = addWavesource model.values pointerCoords
                 }
+
+
+
+--- ANIMATION STATE FUNCTIONS ---
+
+
+advanceAnimation : Model -> Float -> Model
+advanceAnimation model timeStep =
+    let
+        newAnimState =
+            List.map (advanceValue timeStep) model.animationState
+
+        oldValues =
+            model.values
+
+        newValues =
+            { oldValues
+                | wavelength =
+                    newAnimState
+                        |> List.Extra.getAt 0
+                        |> Maybe.map (\v -> (v.value + 1.25) * 50)
+                        |> Maybe.withDefault 0
+                , falloff =
+                    newAnimState
+                        |> List.Extra.getAt 1
+                        |> Maybe.map (\v -> (v.value + 1.5) * 20)
+                        |> Maybe.withDefault 0
+                , threshold =
+                    newAnimState
+                        |> List.Extra.getAt 2
+                        |> Maybe.map (\v -> v.value * 0.1)
+                        |> Maybe.withDefault 0
+            }
+    in
+    { model
+        | values = newValues
+        , animationState = newAnimState
+    }
+
+
+type alias AnimationState =
+    List AnimatedValue
+
+
+initialAnimationState : AnimationState
+initialAnimationState =
+    [ { value = 0
+      , phase = 23500
+      , freq = 1 / 5000
+      }
+    , { value = 0
+      , phase = 25100
+      , freq = 1 / 10000
+      }
+    , { value = 0
+      , phase = 50000
+      , freq = 1 / 15000
+      }
+    ]
+
+
+type alias AnimatedValue =
+    { value : Float
+    , phase : Float
+    , freq : Float
+    }
+
+
+advanceValue : Float -> AnimatedValue -> AnimatedValue
+advanceValue timeStep old =
+    let
+        newPhase =
+            old.phase + timeStep
+
+        newValue =
+            newPhase
+                |> (*) old.freq
+                |> Basics.radians
+                |> Basics.sin
+    in
+    { old
+        | value = newValue
+        , phase = newPhase
+    }
 
 
 
@@ -377,7 +479,7 @@ viewControls values =
         [ slider
             "wavelength"
             values.wavelength
-            ( 20, 300 )
+            ( 10, 300 )
             (\v -> { values | wavelength = v })
         , slider
             "falloff"
