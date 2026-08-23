@@ -33,8 +33,15 @@ maxNumWavesources =
     10
 
 
+{-| How close the pointer must be to a wavesource to select it
+-}
+selectionDistancePx : Float
+selectionDistancePx =
+    150
 
--------
+
+
+--------
 
 
 main : Program () Model UpdateMsg
@@ -69,16 +76,7 @@ main =
                                 ( model, Cmd.none )
 
                             Ok el ->
-                                let
-                                    oldValues =
-                                        model.values
-                                in
-                                ( { model
-                                    | values =
-                                        { oldValues
-                                            | canvasSize = vec2 el.element.width el.element.height
-                                        }
-                                  }
+                                ( updateCanvasSize model el
                                 , Cmd.none
                                 )
         }
@@ -109,6 +107,27 @@ getCanvasSize =
     Task.attempt CanvasSizeUpdate (Browser.Dom.getElement canvasId)
 
 
+updateCanvasSize : Model -> Browser.Dom.Element -> Model
+updateCanvasSize model element =
+    let
+        oldValues =
+            model.values
+
+        newSize =
+            vec2 element.element.width element.element.height
+    in
+    { model
+        | values =
+            { oldValues
+                | canvasSize = newSize
+                , wavesources =
+                    List.map
+                        (resizeVec oldValues.canvasSize newSize)
+                        oldValues.wavesources
+            }
+    }
+
+
 type alias Model =
     { values : Values
     , pointerState : PointerState
@@ -137,8 +156,8 @@ defaultValues =
     { canvasSize = vec2 500 666
     , resolutionMultiplier = 2
     , wavesources =
-        [ vec2 0.33 0.75
-        , vec2 0.66 0.25
+        [ vec2 165 500
+        , vec2 335 167
         ]
     , wavelength = 150
     , falloff = 30
@@ -152,7 +171,9 @@ pointerUpdate model action =
         Inactive ->
             case action of
                 PointerDown event ->
-                    selectWavesource model event
+                    selectWavesource
+                        model
+                        (vec2FromTuple event.pointer.offsetPos)
 
                 PointerUp _ ->
                     model
@@ -176,7 +197,7 @@ pointerUpdate model action =
                         moveWavesource
                             model.values
                             index
-                            event.pointer.offsetPos
+                            (vec2FromTuple event.pointer.offsetPos)
                     }
 
         Dragging index ->
@@ -193,7 +214,7 @@ pointerUpdate model action =
                             moveWavesource
                                 model.values
                                 index
-                                event.pointer.offsetPos
+                                (vec2FromTuple event.pointer.offsetPos)
                     }
 
 
@@ -201,36 +222,27 @@ pointerUpdate model action =
 --- WAVESOURCE MANIPULATION ---
 
 
-{-| TODO: Work with pixel coords everywhere and convert in shader ?
--}
-pixelCoordsToFractional : ( Float, Float ) -> Vec2 -> Vec2
-pixelCoordsToFractional coords canvasSize =
-    vec2
-        (coords |> Tuple.first |> (\x -> x / Vec2.getX canvasSize))
-        (coords |> Tuple.second |> (\y -> y / Vec2.getY canvasSize))
-
-
-addWavesource : Values -> ( Float, Float ) -> Values
+addWavesource : Values -> Vec2 -> Values
 addWavesource old coords =
     { old
         | wavesources =
             old.wavesources
-                ++ [ pixelCoordsToFractional coords old.canvasSize ]
+                ++ [ coords ]
     }
 
 
-moveWavesource : Values -> Int -> ( Float, Float ) -> Values
+moveWavesource : Values -> Int -> Vec2 -> Values
 moveWavesource old index coords =
     let
-        fractionalCoords =
-            pixelCoordsToFractional coords old.canvasSize
-
         newWavesources =
-            List.Extra.setAt index fractionalCoords old.wavesources
+            List.Extra.setAt index coords old.wavesources
     in
     { old | wavesources = newWavesources }
 
 
+{-| Get wavesource by index, the final float in the Vec3 indicates whether the
+wavesource is active or not
+-}
 getWavesource : List Vec2 -> Int -> Vec3
 getWavesource sourceList index =
     sourceList
@@ -239,7 +251,7 @@ getWavesource sourceList index =
             (\v ->
                 vec3
                     (Vec2.getX v)
-                    (1 - Vec2.getY v)
+                    (Vec2.getY v)
                     1.0
             )
         |> Maybe.withDefault
@@ -257,16 +269,13 @@ deleteWavesource values index =
 (creating a new wavesource if appropriate) and transition `pointerState` to
 `Selected`.
 -}
-selectWavesource : Model -> Pointer.Event -> Model
-selectWavesource model event =
+selectWavesource : Model -> Vec2 -> Model
+selectWavesource model pointerCoords =
     let
-        fractionalPointerCoords =
-            pixelCoordsToFractional event.pointer.offsetPos model.values.canvasSize
-
         maybeClosestWavesource =
             model.values.wavesources
                 |> List.indexedMap
-                    (\index coords -> ( Vec2.distanceSquared coords fractionalPointerCoords, index ))
+                    (\index coords -> ( Vec2.distanceSquared coords pointerCoords, index ))
                 |> List.Extra.minimumBy
                     (\( dist, _ ) -> dist)
     in
@@ -274,16 +283,16 @@ selectWavesource model event =
         Nothing ->
             -- Must be no values; Add a new wavesource and select that
             { pointerState = Selected 0
-            , values = addWavesource model.values event.pointer.offsetPos
+            , values = addWavesource model.values pointerCoords
             }
 
         Just ( dist, index ) ->
-            if dist < 0.03 || List.length model.values.wavesources >= maxNumWavesources then
+            if dist < selectionDistancePx || List.length model.values.wavesources >= maxNumWavesources then
                 -- Either the pointer is close to a wavesource, or we've reached
                 -- the maximum allowed wavesources. In both cases we select the
                 -- closest wavesource rather than adding another.
                 { pointerState = Selected index
-                , values = moveWavesource model.values index event.pointer.offsetPos
+                , values = moveWavesource model.values index pointerCoords
                 }
 
             else
@@ -294,7 +303,7 @@ selectWavesource model event =
                         List.length model.values.wavesources
                 in
                 { pointerState = Dragging newIndex
-                , values = addWavesource model.values event.pointer.offsetPos
+                , values = addWavesource model.values pointerCoords
                 }
 
 
@@ -395,27 +404,6 @@ view values =
 --- WEBGL STUFF ---
 
 
-type alias Vertex =
-    { position : Vec3
-    }
-
-
-{-| Simple rectangle to fill screen
--}
-mesh : Mesh Vertex
-mesh =
-    WebGL.triangles
-        [ ( Vertex (vec3 -1 -1 0)
-          , Vertex (vec3 -1 1 0)
-          , Vertex (vec3 1 -1 0)
-          )
-        , ( Vertex (vec3 1 -1 0)
-          , Vertex (vec3 -1 1 0)
-          , Vertex (vec3 1 1 0)
-          )
-        ]
-
-
 {-| The values sent to GLSL
 -}
 type alias Uniforms =
@@ -462,6 +450,27 @@ valuesToUniforms values =
     }
 
 
+type alias Vertex =
+    { position : Vec3
+    }
+
+
+{-| Simple rectangle to fill screen
+-}
+mesh : Mesh Vertex
+mesh =
+    WebGL.triangles
+        [ ( Vertex (vec3 -1 -1 0)
+          , Vertex (vec3 -1 1 0)
+          , Vertex (vec3 1 -1 0)
+          )
+        , ( Vertex (vec3 1 -1 0)
+          , Vertex (vec3 -1 1 0)
+          , Vertex (vec3 1 1 0)
+          )
+        ]
+
+
 {-| Vertex shader just draws a rectangle, all the interesting stuff happens in
 the fragment shader.
 -}
@@ -504,20 +513,26 @@ fragmentShader =
         uniform vec3 wavesource9;
         uniform vec3 wavesource10;
 
+        vec2 pixelToClipSpace(in vec2 coords) {
+            coords /= canvasSize;
+            coords.y = 1.0 - coords.y;
+            return coords;
+        }
+
         void main() {
             vec2 pixel_pos = gl_FragCoord.xy / (canvasSize * float(resolutionMultiplier));
 
-            float dist0 = distance(pixel_pos, wavesource0.xy);
-            float dist1 = distance(pixel_pos, wavesource1.xy);
-            float dist2 = distance(pixel_pos, wavesource2.xy);
-            float dist3 = distance(pixel_pos, wavesource3.xy);
-            float dist4 = distance(pixel_pos, wavesource4.xy);
-            float dist5 = distance(pixel_pos, wavesource5.xy);
-            float dist6 = distance(pixel_pos, wavesource6.xy);
-            float dist7 = distance(pixel_pos, wavesource7.xy);
-            float dist8 = distance(pixel_pos, wavesource8.xy);
-            float dist9 = distance(pixel_pos, wavesource9.xy);
-            float dist10 = distance(pixel_pos, wavesource10.xy);
+            float dist0 = distance(pixel_pos, pixelToClipSpace(wavesource0.xy));
+            float dist1 = distance(pixel_pos, pixelToClipSpace(wavesource1.xy));
+            float dist2 = distance(pixel_pos, pixelToClipSpace(wavesource2.xy));
+            float dist3 = distance(pixel_pos, pixelToClipSpace(wavesource3.xy));
+            float dist4 = distance(pixel_pos, pixelToClipSpace(wavesource4.xy));
+            float dist5 = distance(pixel_pos, pixelToClipSpace(wavesource5.xy));
+            float dist6 = distance(pixel_pos, pixelToClipSpace(wavesource6.xy));
+            float dist7 = distance(pixel_pos, pixelToClipSpace(wavesource7.xy));
+            float dist8 = distance(pixel_pos, pixelToClipSpace(wavesource8.xy));
+            float dist9 = distance(pixel_pos, pixelToClipSpace(wavesource9.xy));
+            float dist10 = distance(pixel_pos, pixelToClipSpace(wavesource10.xy));
 
             float continuous = (
               + wavesource0.z * sin(dist0 * wavelength) / (1.0 + (dist0 * falloff))
@@ -537,3 +552,30 @@ fragmentShader =
             gl_FragColor = vec4(val, val, val, 1);
         }
     |]
+
+
+
+--- HELPER FUNCTIONS ---
+
+
+vec2FromTuple : ( Float, Float ) -> Vec2
+vec2FromTuple ( x, y ) =
+    vec2 x y
+
+
+resizeVec : Vec2 -> Vec2 -> Vec2 -> Vec2
+resizeVec sizeBefore sizeAfter targetVec =
+    let
+        xscale =
+            Vec2.getX sizeAfter / Vec2.getX sizeBefore
+
+        yscale =
+            Vec2.getY sizeAfter / Vec2.getY sizeBefore
+
+        x =
+            Vec2.getX targetVec
+
+        y =
+            Vec2.getY targetVec
+    in
+    vec2 (x * xscale) (y * yscale)
