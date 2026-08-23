@@ -5,7 +5,7 @@ import Browser.Dom
 import Browser.Events exposing (onAnimationFrameDelta)
 import Html exposing (Html, div, i, input, label, text)
 import Html.Attributes as Attr exposing (..)
-import Html.Events exposing (onInput)
+import Html.Events exposing (onClick, onInput)
 import Html.Events.Extra.Pointer as Pointer
 import List.Extra
 import Math.Vector2 as Vec2 exposing (Vec2, vec2)
@@ -59,17 +59,14 @@ main =
             \update model ->
                 case update of
                     TimeUpdate elapsedTime ->
-                        if model.drifting then
+                        if model.values.isDrifting then
                             ( advanceAnimation model elapsedTime, Cmd.none )
 
                         else
                             ( model, Cmd.none )
 
                     SliderUpdate newValues ->
-                        ( { model
-                            | values = newValues
-                            , drifting = False
-                          }
+                        ( { model | values = newValues }
                         , Cmd.none
                         )
 
@@ -141,7 +138,6 @@ type alias Model =
     { values : Values
     , pointerState : PointerState
     , animationState : AnimationState
-    , drifting : Bool
     }
 
 
@@ -150,7 +146,6 @@ defaultModel =
     { values = defaultValues
     , pointerState = Inactive
     , animationState = initialAnimationState
-    , drifting = True
     }
 
 
@@ -161,6 +156,7 @@ type alias Values =
     , wavelength : Float
     , falloff : Float
     , threshold : Float
+    , isDrifting : Bool
     }
 
 
@@ -175,6 +171,7 @@ defaultValues =
     , wavelength = 150
     , falloff = 30
     , threshold = -0.07
+    , isDrifting = True
     }
 
 
@@ -448,11 +445,11 @@ slider sliderName value ( minVal, maxVal ) onChange =
     div
         []
         [ label
-            [ for ("slider-" ++ sliderName) ]
+            [ Attr.for ("slider-" ++ sliderName) ]
             [ text sliderName ]
         , input
-            [ type_ "range"
-            , name ("slider-" ++ sliderName)
+            [ Attr.type_ "range"
+            , Attr.name ("slider-" ++ sliderName)
             , Attr.attribute
                 "style"
                 ("--meter-value: " ++ String.fromFloat sliderPercent ++ "%;")
@@ -473,6 +470,27 @@ slider sliderName value ( minVal, maxVal ) onChange =
         ]
 
 
+viewDriftControl : String -> Bool -> (Bool -> Values) -> Html UpdateMsg
+viewDriftControl boxName isChecked onChange =
+    div []
+        [ label
+            [ Attr.for ("checkbox-" ++ boxName) ]
+            [ text boxName ]
+        , input
+            [ Attr.type_ "checkbox"
+            , Attr.name ("checkbox" ++ boxName)
+            , Attr.checked isChecked
+            , onClick
+                (isChecked
+                    |> not
+                    |> onChange
+                    |> SliderUpdate
+                )
+            ]
+            []
+        ]
+
+
 viewControls : Values -> Html UpdateMsg
 viewControls values =
     div []
@@ -480,17 +498,21 @@ viewControls values =
             "wavelength"
             values.wavelength
             ( 10, 300 )
-            (\v -> { values | wavelength = v })
+            (\v -> { values | wavelength = v, isDrifting = False })
         , slider
             "falloff"
             values.falloff
             ( 0, 60 )
-            (\v -> { values | falloff = v })
+            (\v -> { values | falloff = v, isDrifting = False })
         , slider
             "threshold"
             values.threshold
             ( -0.4, 0.4 )
-            (\v -> { values | threshold = v })
+            (\v -> { values | threshold = v, isDrifting = False })
+        , viewDriftControl
+            "animate"
+            values.isDrifting
+            (\v -> { values | isDrifting = v })
         ]
 
 

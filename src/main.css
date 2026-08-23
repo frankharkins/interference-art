@@ -32,6 +32,8 @@
     color: var(--color-body);
     transition: all 0.1s ease-in-out;
 
+    accent-color: var(--color-cyan);
+
     [data-theme="Dark"] {
         --color-title: var(--color-white);
         --color-bg: var(--color-black);
@@ -192,10 +194,6 @@
         min-width: 4rem;
     }
 
-    input {
-        width: 100%;
-    }
-
     .webgl-canvas {
         width: 100%;
         display: block;
@@ -209,6 +207,14 @@
     /* There's a lot of css here to handle different browsers; see
     https://www.smashingmagazine.com/2021/12/create-custom-range-input-consistent-browsers
     for details. */
+
+    input {
+        cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+        margin-left: 1rem;
+    }
 
     input[type="range"] {
         grid-row-start: 1;
