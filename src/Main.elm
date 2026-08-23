@@ -6,11 +6,10 @@ import Browser.Events exposing (onAnimationFrameDelta)
 import Html exposing (Html, div, input, label, text)
 import Html.Attributes as Attr exposing (..)
 import Html.Events exposing (onInput)
-import Html.Events.Extra.Pointer as Pointer exposing (Event, onDown)
-import List.Extra exposing (getAt)
-import Math.Matrix4 as Mat4 exposing (Mat4)
-import Math.Vector2 as Vec2 exposing (Vec2, distanceSquared, vec2)
-import Math.Vector3 as Vec3 exposing (Vec3, vec3)
+import Html.Events.Extra.Pointer as Pointer
+import List.Extra
+import Math.Vector2 as Vec2 exposing (Vec2, vec2)
+import Math.Vector3 exposing (Vec3, vec3)
 import Platform.Cmd as Cmd
 import Task
 import WebGL exposing (Mesh, Shader)
@@ -18,16 +17,24 @@ import WebGL exposing (Mesh, Shader)
 
 
 --- Constants ---
--- Element ID of the webgl canvas
 
 
+{-| HTML element ID of the WebGL canvas
+-}
 canvasId : String
 canvasId =
     "webgl-canvas"
 
 
+{-| We only support up to this many waves sources on the canvas
+-}
+maxNumWavesources : Int
+maxNumWavesources =
+    10
 
-------
+
+
+-------
 
 
 main : Program () Model UpdateMsg
@@ -117,6 +124,7 @@ defaultModel =
 
 type alias Values =
     { canvasSize : Vec2
+    , resolutionMultiplier : Int
     , wavesources : List Vec2
     , wavelength : Float
     , falloff : Float
@@ -127,6 +135,7 @@ type alias Values =
 defaultValues : Values
 defaultValues =
     { canvasSize = vec2 500 666
+    , resolutionMultiplier = 2
     , wavesources =
         [ vec2 0.33 0.75
         , vec2 0.66 0.25
@@ -188,54 +197,12 @@ pointerUpdate model action =
                     }
 
 
-deleteWavesource : Values -> Int -> Values
-deleteWavesource values index =
-    { values
-        | wavesources = List.Extra.removeAt index values.wavesources
-    }
+
+--- WAVESOURCE MANIPULATION ---
 
 
-selectWavesource : Model -> Pointer.Event -> Model
-selectWavesource model event =
-    let
-        fractionalPointerCoords =
-            pixelCoordsToFractional event.pointer.offsetPos model.values.canvasSize
-
-        maybeClosestWavesource =
-            model.values.wavesources
-                |> List.indexedMap
-                    (\index coords -> ( Vec2.distanceSquared coords fractionalPointerCoords, index ))
-                |> List.Extra.minimumBy
-                    (\( dist, _ ) -> dist)
-    in
-    case maybeClosestWavesource of
-        Nothing ->
-            -- Must be no values; Add a new wavesource and select that
-            { pointerState = Selected 0
-            , values = addWavesource model.values event.pointer.offsetPos
-            }
-
-        Just ( dist, index ) ->
-            if dist > 0.03 && List.length model.values.wavesources < 10 then
-                -- Too far away to select a source so we add a new one and select that
-                let
-                    newIndex =
-                        List.length model.values.wavesources
-                in
-                { pointerState = Dragging newIndex
-                , values = addWavesource model.values event.pointer.offsetPos
-                }
-
-            else
-                { pointerState = Selected index
-                , values = moveWavesource model.values index event.pointer.offsetPos
-                }
-
-
-
--- TODO: Work with pixel coords everywhere and convert in shader
-
-
+{-| TODO: Work with pixel coords everywhere and convert in shader ?
+-}
 pixelCoordsToFractional : ( Float, Float ) -> Vec2 -> Vec2
 pixelCoordsToFractional coords canvasSize =
     vec2
@@ -264,11 +231,82 @@ moveWavesource old index coords =
     { old | wavesources = newWavesources }
 
 
+getWavesource : List Vec2 -> Int -> Vec3
+getWavesource sourceList index =
+    sourceList
+        |> List.Extra.getAt index
+        |> Maybe.map
+            (\v ->
+                vec3
+                    (Vec2.getX v)
+                    (1 - Vec2.getY v)
+                    1.0
+            )
+        |> Maybe.withDefault
+            (vec3 0 0 0)
+
+
+deleteWavesource : Values -> Int -> Values
+deleteWavesource values index =
+    { values
+        | wavesources = List.Extra.removeAt index values.wavesources
+    }
+
+
+{-| Given the model and pointer event, decide which wavesource to select
+(creating a new wavesource if appropriate) and transition `pointerState` to
+`Selected`.
+-}
+selectWavesource : Model -> Pointer.Event -> Model
+selectWavesource model event =
+    let
+        fractionalPointerCoords =
+            pixelCoordsToFractional event.pointer.offsetPos model.values.canvasSize
+
+        maybeClosestWavesource =
+            model.values.wavesources
+                |> List.indexedMap
+                    (\index coords -> ( Vec2.distanceSquared coords fractionalPointerCoords, index ))
+                |> List.Extra.minimumBy
+                    (\( dist, _ ) -> dist)
+    in
+    case maybeClosestWavesource of
+        Nothing ->
+            -- Must be no values; Add a new wavesource and select that
+            { pointerState = Selected 0
+            , values = addWavesource model.values event.pointer.offsetPos
+            }
+
+        Just ( dist, index ) ->
+            if dist < 0.03 || List.length model.values.wavesources >= maxNumWavesources then
+                -- Either the pointer is close to a wavesource, or we've reached
+                -- the maximum allowed wavesources. In both cases we select the
+                -- closest wavesource rather than adding another.
+                { pointerState = Selected index
+                , values = moveWavesource model.values index event.pointer.offsetPos
+                }
+
+            else
+                -- Too far away to select an existing source, so we add a new
+                -- one and select that
+                let
+                    newIndex =
+                        List.length model.values.wavesources
+                in
+                { pointerState = Dragging newIndex
+                , values = addWavesource model.values event.pointer.offsetPos
+                }
+
+
+
+--- VIEW FUNCTIONS ---
+
+
 viewCanvas : Values -> Html UpdateMsg
 viewCanvas values =
     WebGL.toHtml
-        [ values.canvasSize |> Vec2.getX |> round |> (*) 2 |> Attr.width
-        , values.canvasSize |> Vec2.getY |> round |> (*) 2 |> Attr.height
+        [ values.canvasSize |> Vec2.getX |> round |> (*) values.resolutionMultiplier |> Attr.width
+        , values.canvasSize |> Vec2.getY |> round |> (*) values.resolutionMultiplier |> Attr.height
         , Attr.class "webgl-canvas"
         , Attr.id canvasId
         , Pointer.onDown (PointerUpdate << PointerDown)
@@ -283,6 +321,8 @@ viewCanvas values =
         ]
 
 
+{-| Calculate step size between `min` and `max` for `numSteps`
+-}
 getStep : Float -> Float -> Float -> Float
 getStep min max numSteps =
     (max - min) / numSteps
@@ -308,12 +348,12 @@ slider sliderName value ( minVal, maxVal ) onChange =
             , Attr.value <| String.fromFloat value
             , Attr.min (minVal |> String.fromFloat)
             , Attr.max (maxVal |> String.fromFloat)
-            , Attr.step (getStep minVal maxVal 100 |> String.fromFloat)
+            , Attr.step (getStep minVal maxVal 200 |> String.fromFloat)
             , onInput
                 (\v ->
                     v
                         |> String.toFloat
-                        |> Maybe.withDefault 0
+                        |> Maybe.withDefault minVal
                         |> onChange
                         |> SliderUpdate
                 )
@@ -352,7 +392,7 @@ view values =
 
 
 
--- Mesh
+--- WEBGL STUFF ---
 
 
 type alias Vertex =
@@ -360,10 +400,8 @@ type alias Vertex =
     }
 
 
-
--- Rectangle to fill screen
-
-
+{-| Simple rectangle to fill screen
+-}
 mesh : Mesh Vertex
 mesh =
     WebGL.triangles
@@ -378,27 +416,11 @@ mesh =
         ]
 
 
-
--- Shaders
-
-
-getWavesource : List Vec2 -> Int -> Vec3
-getWavesource sourceList index =
-    sourceList
-        |> List.Extra.getAt index
-        |> Maybe.map
-            (\v ->
-                vec3
-                    (Vec2.getX v)
-                    (1 - Vec2.getY v)
-                    1.0
-            )
-        |> Maybe.withDefault
-            (vec3 0 0 0)
-
-
+{-| The values sent to GLSL
+-}
 type alias Uniforms =
     { canvasSize : Vec2
+    , resolutionMultiplier : Int
     , wavelength : Float
     , falloff : Float
     , threshold : Float
@@ -422,6 +444,7 @@ type alias Uniforms =
 valuesToUniforms : Values -> Uniforms
 valuesToUniforms values =
     { canvasSize = values.canvasSize
+    , resolutionMultiplier = values.resolutionMultiplier
     , wavelength = values.wavelength
     , falloff = values.falloff
     , threshold = values.threshold
@@ -439,11 +462,9 @@ valuesToUniforms values =
     }
 
 
-
--- Vertex shader just draws a rectangle, all the interesting stuff happens in
--- the fragment shader.
-
-
+{-| Vertex shader just draws a rectangle, all the interesting stuff happens in
+the fragment shader.
+-}
 vertexShader : Shader Vertex Uniforms {}
 vertexShader =
     [glsl|
@@ -454,12 +475,19 @@ vertexShader =
     |]
 
 
+{-| This is the fun bit! We calculate the interference pattern based on the
+values passed through by Elm. Unfortunately, a limitation in Elm means we can't
+pass an array of `Vec2` so we instead pass each wavesource coordinate
+separately. I think we could alternatively convert these to a flat array and
+resconstruct in GLSL, but this is fine for now.
+-}
 fragmentShader : Shader {} Uniforms {}
 fragmentShader =
     [glsl|
         precision mediump float;
 
         uniform vec2 canvasSize;
+        uniform int resolutionMultiplier;
         uniform float wavelength;
         uniform float falloff;
         uniform float threshold;
@@ -477,7 +505,7 @@ fragmentShader =
         uniform vec3 wavesource10;
 
         void main() {
-            vec2 pixel_pos = gl_FragCoord.xy / (canvasSize * 2.0);
+            vec2 pixel_pos = gl_FragCoord.xy / (canvasSize * float(resolutionMultiplier));
 
             float dist0 = distance(pixel_pos, wavesource0.xy);
             float dist1 = distance(pixel_pos, wavesource1.xy);

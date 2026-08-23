@@ -15,7 +15,6 @@ install: # Install everything needed to build this project
 format:
 	elm-format . --yes
 
-
 build:
 	rm -rf ./build && mkdir -p ./build
 
