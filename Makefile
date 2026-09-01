@@ -18,10 +18,10 @@ format:
 build:
 	rm -rf ./build && mkdir -p ./build
 
-	elm-optimize-level-2 --optimize-speed src/Main.elm --output=build/main.min.js
-	mv ./build/main.min.js ./build/main.js
+	elm-optimize-level-2 --optimize-speed src/Main.elm --output=build/main.js
 
 	terser ./build/main.js --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' | terser --mangle --output=./build/main.min.js
+	rm ./build/main.js
 	minify ./src/index.html > ./build/index.html
 	minify ./src/main.css > ./build/main.css
 	cp src/favicon.svg ./build/
